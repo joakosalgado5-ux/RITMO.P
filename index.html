@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Ritmo+ — Seguimiento de Hábitos</title>
+  <style>
+    :root{
+      --bg:#0f172a; --bg-2:#111827; --ink:#e5e7eb; --muted:#94a3b8;
+      --card:#0b1220; --line:#1f2937; --accent:#22d3ee; --ok:#22c55e; --warn:#f59e0b;
+      --bad:#ef4444;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,Segoe UI,Roboto,Arial}
+    header{position:sticky;top:0;z-index:10;background:var(--bg-2);border-bottom:1px solid var(--line);padding:14px 18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+    header h1{font-size:18px;margin:0}
+    header .meta{font-size:13px;color:var(--muted)}
+    main{padding:18px}
+    .grid{display:grid;gap:16px}
+    @media(min-width:900px){ .grid{grid-template-columns:1.1fr 1fr} }
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+    .card h2{margin:0 0 10px 0;font-size:18px}
+    .row{display:grid;gap:12px}
+    @media(min-width:560px){ .row.cols-2{grid-template-columns:1fr 1fr} .row.cols-4{grid-template-columns:repeat(4,1fr)} }
+    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+    input,button,select{font:inherit}
+    input[type="number"],input[type="date"],input[type="text"],select{
+      width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#0a0f1c;color:var(--ink)
+    }
+    .btn{padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:#0a0f1c;color:var(--ink);cursor:pointer}
+    .btn:hover{border-color:var(--accent)}
+    .btn.ok{border-color:transparent;background:linear-gradient(180deg,#0ea5e9,#0891b2)}
+    .hint{font-size:12px;color:var(--muted)}
+    .stack{display:flex;gap:8px;flex-wrap:wrap}
+    .bar{height:12px;background:#0a0f1c;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+    .bar>span{display:block;height:100%;background:var(--accent);width:0%}
+    .tag{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px;background:#0a1020;color:var(--ink)}
+    .oktag{background:rgba(34,197,94,.12);color:#86efac;border-color:#14532d}
+    .badtag{background:rgba(239,68,68,.12);color:#fecaca;border-color:#7f1d1d}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}
+    .right{text-align:right}
+    .muted{color:var(--muted)}
+    .danger{color:var(--bad)}
+    .toast{position:fixed;right:16px;bottom:16px;background:#0b1220;border:1px solid var(--line);padding:12px 14px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.4);opacity:0;transform:translateY(8px);transition:.2s all}
+    .toast.show{opacity:1;transform:none}
+    .hr{height:1px;background:var(--line);margin:10px 0}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Ritmo+ <span class="meta">— Seguimiento de Hábitos</span></h1>
+    <span class="tag">LocalStorage</span>
+    <span id="status" class="tag">Listo</span>
+  </header>
+
+  <main class="grid">
+    <!-- Columna izquierda -->
+    <section class="card">
+      <h2>1) Configurar metas</h2>
+      <form id="formMetas" class="row cols-2">
+        <div>
+          <label>Horas de sueño (0–24)</label>
+          <input type="number" id="mSueno" step="0.1" min="0" max="24" required />
+          <div class="hint">Recomendado: 8 h</div>
+        </div>
+        <div>
+          <label>Vasos de agua (0–30)</label>
+          <input type="number" id="mAgua" min="0" max="30" required />
+          <div class="hint">1 vaso = 250 ml</div>
+        </div>
+        <div>
+          <label>Estudio (minutos, 0–600)</label>
+          <input type="number" id="mEstudio" min="0" max="600" required />
+        </div>
+        <div>
+          <label>Ejercicio (minutos, 0–600)</label>
+          <input type="number" id="mEjercicio" min="0" max="600" required />
+        </div>
+        <div class="stack">
+          <button type="submit" class="btn ok">Guardar metas</button>
+          <button type="button" id="btnMetasDefault" class="btn">Valores por defecto</button>
+        </div>
+      </form>
+      <div class="hr"></div>
+      <div class="hint">Las metas se guardan automáticamente en tu navegador.</div>
+    </section>
+
+    <section class="card">
+      <h2>2) Registrar/editar día</h2>
+      <form id="formDia" class="row cols-2">
+        <div>
+          <label>Fecha</label>
+          <input type="date" id="fFecha" required />
+          <div class="hint"><button type="button" class="btn" id="btnHoy">Usar hoy</button></div>
+        </div>
+        <div>
+          <label>Horas de sueño (0–24)</label>
+          <input type="number" id="fSueno" step="0.1" min="0" max="24" required />
+        </div>
+        <div>
+          <label>Vasos de agua (0–30)</label>
+          <input type="number" id="fAgua" min="0" max="30" required />
+        </div>
+        <div>
+          <label>Estudio (minutos, 0–600)</label>
+          <input type="number" id="fEstudio" min="0" max="600" required />
+        </div>
+        <div>
+          <label>Ejercicio (minutos, 0–600)</label>
+          <input type="number" id="fEjercicio" min="0" max="600" required />
+        </div>
+        <div class="stack">
+          <button type="submit" class="btn ok">Guardar día</button>
+          <button type="button" id="btnCargarFecha" class="btn">Cargar si existe</button>
+        </div>
+      </form>
+      <div class="hint">Si la fecha ya existe, se actualizan los valores.</div>
+    </section>
+
+    <!-- Columna derecha -->
+    <section class="card">
+      <h2>3) Estado del último día</h2>
+      <div id="estado">
+        <div class="muted">Sin registros todavía.</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4) Resumen semanal (últimos 7 registros)</h2>
+      <div id="semanal">
+        <div class="muted">Sin registros suficientes.</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>5) Rachas</h2>
+      <div id="rachas">
+        <div class="muted">Sin registros.</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>6) Registros</h2>
+      <div class="stack">
+        <button class="btn" id="btnExport">Exportar JSON</button>
+        <label class="btn" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+          Importar JSON <input id="fileImport" type="file" accept="application/json" style="display:none">
+        </label>
+        <button class="btn danger" id="btnReset" title="Borrar todo">Borrar todo</button>
+      </div>
+      <div id="tablaRegistros" class="row" style="margin-top:10px">
+        <div class="muted">Aún no hay días guardados.</div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast">Listo</div>
+
+  <script>
+    // --- Persistencia ---
+    const KEY = "ritmoplusData_v1";
+    const def = () => ({
+      metas: { sueno: 8, agua: 8, estudio: 60, ejercicio: 30 },
+      registros: [] // {fecha:"YYYY-MM-DD", sueno: num, agua: int, estudio: int, ejercicio: int}
+    });
+
+    const load = () => {
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (!raw) return def();
+        const data = JSON.parse(raw);
+        // saneo mínimo
+        if (!data.metas) data.metas = def().metas;
+        if (!Array.isArray(data.registros)) data.registros = [];
+        return data;
+      } catch { return def(); }
+    };
+
+    const save = (data) => localStorage.setItem(KEY, JSON.stringify(data));
+    const toast = (msg) => {
+      const t = document.getElementById("toast");
+      t.textContent = msg; t.classList.add("show");
+      setTimeout(()=> t.classList.remove("show"), 1400);
+    };
+    const setStatus = (msg) => document.getElementById("status").textContent = msg;
+
+    // --- Utilidades ---
+    const clamp = (v,min,max) => Math.min(Math.max(v,min),max);
+    const pct = (a,m) => (m>0 && isFinite(m)) ? (a/m)*100 : (m===0?100:0);
+    const byDateAsc = (a,b) => a.fecha.localeCompare(b.fecha);
+
+    // --- Estado global ---
+    let state = load();
+
+    // --- Inicialización UI ---
+    const $ = (sel) => document.querySelector(sel);
+    const estadoBox = $("#estado");
+    const semanalBox = $("#semanal");
+    const rachasBox = $("#rachas");
+    const tablaBox = $("#tablaRegistros");
+
+    // Rellenar metas en el form
+    const fillMetasForm = () => {
+      $("#mSueno").value = state.metas.sueno;
+      $("#mAgua").value = state.metas.agua;
+      $("#mEstudio").value = state.metas.estudio;
+      $("#mEjercicio").value = state.metas.ejercicio;
+    };
+
+    // Hoy
+    const todayISO = () => new Date().toISOString().slice(0,10);
+
+    // Buscar índice de fecha
+    const idxFecha = (fecha) => state.registros.findIndex(r => r.fecha === fecha);
+
+    // Guardar metas
+    $("#formMetas").addEventListener("submit",(e)=>{
+      e.preventDefault();
+      const sueno = clamp(Number($("#mSueno").value),0,24);
+      const agua = clamp(Number($("#mAgua").value),0,30);
+      const estudio = clamp(Number($("#mEstudio").value),0,600);
+      const ejercicio = clamp(Number($("#mEjercicio").value),0,600);
+      state.metas = { sueno, agua, estudio, ejercicio };
+      save(state); toast("✅ Metas guardadas"); setStatus("Metas OK");
+      renderAll();
+    });
+
+    $("#btnMetasDefault").addEventListener("click",()=>{
+      state.metas = def().metas; save(state); fillMetasForm();
+      toast("Metas por defecto"); renderAll();
+    });
+
+    // Registrar/editar día
+    $("#btnHoy").addEventListener("click",()=> { $("#fFecha").value = todayISO(); });
+
+    $("#btnCargarFecha").addEventListener("click",()=>{
+      const f = $("#fFecha").value;
+      if (!f) { toast("Ingresa una fecha"); return; }
+      const i = idxFecha(f);
+      if (i === -1) { toast("No hay registro en esa fecha"); return; }
+      const r = state.registros[i];
+      $("#fSueno").value = r.sueno; $("#fAgua").value = r.agua;
+      $("#fEstudio").value = r.estudio; $("#fEjercicio").value = r.ejercicio;
+      toast("Registro cargado");
+    });
+
+    $("#formDia").addEventListener("submit",(e)=>{
+      e.preventDefault();
+      const fecha = $("#fFecha").value || todayISO();
+      const sueno = clamp(Number($("#fSueno").value),0,24);
+      const agua = clamp(Number($("#fAgua").value),0,30);
+      const estudio = clamp(Number($("#fEstudio").value),0,600);
+      const ejercicio = clamp(Number($("#fEjercicio").value),0,600);
+
+      const i = idxFecha(fecha);
+      const reg = { fecha, sueno, agua, estudio, ejercicio };
+      if (i === -1) state.registros.push(reg);
+      else state.registros[i] = reg;
+
+      state.registros.sort(byDateAsc);
+      save(state);
+      toast(i === -1 ? "✅ Día agregado" : "✅ Día actualizado");
+      setStatus("Datos OK");
+      renderAll();
+    });
+
+    // Export / Import / Reset
+    $("#btnExport").addEventListener("click",()=>{
+      const blob = new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "ritmoplus_backup.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+
+    $("#fileImport").addEventListener("change",(e)=>{
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try{
+          const data = JSON.parse(reader.result);
+          if (!data || !data.metas || !Array.isArray(data.registros)) throw new Error("formato");
+          state = data; state.registros.sort(byDateAsc); save(state);
+          fillMetasForm(); renderAll(); toast("Importado correctamente");
+        } catch { toast("Archivo inválido"); }
+      };
+      reader.readAsText(file);
+      e.target.value = "";
+    });
+
+    $("#btnReset").addEventListener("click",()=>{
+      if (!confirm("¿Borrar todas las metas y registros?")) return;
+      state = def(); save(state); fillMetasForm(); renderAll(); toast("Datos borrados");
+    });
+
+    // --- Renderizadores ---
+    const fmt = (n,dec=0) => isFinite(n) ? Number(n).toFixed(dec) : "0";
+    const pill = (ok) => ok ? '<span class="tag oktag">OK</span>' : '<span class="tag badtag">FALTA</span>';
+    const bar = (p)=> `<div class="bar"><span style="width:${clamp(p,0,100)}%"></span></div>`;
+
+    function renderEstado(){
+      if (state.registros.length === 0){
+        estadoBox.innerHTML = '<div class="muted">Sin registros todavía.</div>';
+        return;
+      }
+      const r = state.registros[state.registros.length-1];
+      const m = state.metas;
+      const pS = pct(r.sueno,m.sueno), pA = pct(r.agua,m.agua), pE = pct(r.estudio,m.estudio), pX = pct(r.ejercicio,m.ejercicio);
+
+      estadoBox.innerHTML = `
+        <div class="muted">Fecha: <strong>${r.fecha}</strong></div>
+        <div class="row">
+          <div>
+            <div><strong>Sueño</strong> — ${fmt(r.sueno,1)} / ${fmt(m.sueno,1)} h ${pill(r.sueno >= m.sueno)}</div>
+            ${bar(pS)}
+          </div>
+          <div>
+            <div><strong>Agua</strong> — ${r.agua} / ${m.agua} vasos ${pill(r.agua >= m.agua)}</div>
+            ${bar(pA)}
+          </div>
+          <div>
+            <div><strong>Estudio</strong> — ${r.estudio} / ${m.estudio} min ${pill(r.estudio >= m.estudio)}</div>
+            ${bar(pE)}
+          </div>
+          <div>
+            <div><strong>Ejercicio</strong> — ${r.ejercicio} / ${m.ejercicio} min ${pill(r.ejercicio >= m.ejercicio)}</div>
+            ${bar(pX)}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSemanal(){
+      if (state.registros.length === 0){
+        semanalBox.innerHTML = '<div class="muted">Sin registros.</div>';
+        return;
+      }
+      const regs = [...state.registros].slice(-7); // últimos 7 ingresados
+      const n = regs.length;
+      const s = regs.reduce((a,r)=>a+r.sueno,0);
+      const a = regs.reduce((a,r)=>a+r.agua,0);
+      const e = regs.reduce((a,r)=>a+r.estudio,0);
+      const x = regs.reduce((a,r)=>a+r.ejercicio,0);
+      const prom = {
+        sueno: n? s/n : 0,
+        agua : n? a/n : 0,
+        estudio: n? e/n : 0,
+        ejercicio: n? x/n : 0
+      };
+      const m = state.metas;
+      semanalBox.innerHTML = `
+        <div class="muted">Período: últimos ${n} registro(s)</div>
+        <table>
+          <thead><tr><th>Hábito</th><th class="right">Promedio</th><th class="right">Meta</th><th class="right">% Meta</th></tr></thead>
+          <tbody>
+            <tr><td>Sueño (h)</td><td class="right">${fmt(prom.sueno,1)}</td><td class="right">${fmt(m.sueno,1)}</td><td class="right">${fmt(pct(prom.sueno,m.sueno),1)}%</td></tr>
+            <tr><td>Agua (vasos)</td><td class="right">${fmt(prom.agua,0)}</td><td class="right">${m.agua}</td><td class="right">${fmt(pct(prom.agua,m.agua),1)}%</td></tr>
+            <tr><td>Estudio (min)</td><td class="right">${fmt(prom.estudio,0)}</td><td class="right">${m.estudio}</td><td class="right">${fmt(pct(prom.estudio,m.estudio),1)}%</td></tr>
+            <tr><td>Ejercicio (min)</td><td class="right">${fmt(prom.ejercicio,0)}</td><td class="right">${m.ejercicio}</td><td class="right">${fmt(pct(prom.ejercicio,m.ejercicio),1)}%</td></tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderRachas(){
+      if (state.registros.length === 0){
+        rachasBox.innerHTML = '<div class="muted">Sin registros.</div>';
+        return;
+      }
+      const m = state.metas;
+      let curS=0, curA=0, curE=0, curX=0, bestS=0, bestA=0, bestE=0, bestX=0;
+
+      for (const r of state.registros){
+        // Sueño
+        if (r.sueno >= m.sueno){ curS++; bestS = Math.max(bestS,curS); } else { curS=0; }
+        // Agua
+        if (r.agua >= m.agua){ curA++; bestA = Math.max(bestA,curA); } else { curA=0; }
+        // Estudio
+        if (r.estudio >= m.estudio){ curE++; bestE = Math.max(bestE,curE); } else { curE=0; }
+        // Ejercicio
+        if (r.ejercicio >= m.ejercicio){ curX++; bestX = Math.max(bestX,curX); } else { curX=0; }
+      }
+
+      rachasBox.innerHTML = `
+        <div class="row cols-2">
+          <div><strong>Sueño</strong> — actual <span class="tag">${curS}</span> | mejor <span class="tag">${bestS}</span></div>
+          <div><strong>Agua</strong> — actual <span class="tag">${curA}</span> | mejor <span class="tag">${bestA}</span></div>
+          <div><strong>Estudio</strong> — actual <span class="tag">${curE}</span> | mejor <span class="tag">${bestE}</span></div>
+          <div><strong>Ejercicio</strong> — actual <span class="tag">${curX}</span> | mejor <span class="tag">${bestX}</span></div>
+        </div>
+        <div class="hint">Las rachas consideran los registros en el orden que fueron agregados.</div>
+      `;
+    }
+
+    function renderTabla(){
+      if (state.registros.length === 0){
+        tablaBox.innerHTML = '<div class="muted">Aún no hay días guardados.</div>';
+        return;
+      }
+      let html = `
+        <table>
+          <thead>
+            <tr><th>Fecha</th><th class="right">Sueño (h)</th><th class="right">Agua</th><th class="right">Estudio (min)</th><th class="right">Ejercicio (min)</th><th></th></tr>
+          </thead><tbody>
+      `;
+      for (const r of state.registros){
+        html += `
+          <tr data-fecha="${r.fecha}">
+            <td>${r.fecha}</td>
+            <td class="right">${fmt(r.sueno,1)}</td>
+            <td class="right">${r.agua}</td>
+            <td class="right">${r.estudio}</td>
+            <td class="right">${r.ejercicio}</td>
+            <td><button class="btn btnRow" data-fecha="${r.fecha}">Editar</button> <button class="btn btnDel" data-fecha="${r.fecha}">Borrar</button></td>
+          </tr>
+        `;
+      }
+      html += `</tbody></table>`;
+      tablaBox.innerHTML = html;
+
+      // Delegación: editar/borrar
+      tablaBox.querySelectorAll(".btnRow").forEach(b=>{
+        b.addEventListener("click",()=>{
+          const f = b.dataset.fecha;
+          const i = idxFecha(f); if (i===-1) return;
+          const r = state.registros[i];
+          $("#fFecha").value = r.fecha;
+          $("#fSueno").value = r.sueno;
+          $("#fAgua").value = r.agua;
+          $("#fEstudio").value = r.estudio;
+          $("#fEjercicio").value = r.ejercicio;
+          toast("Cargado para edición");
+          window.scrollTo({top:0,behavior:"smooth"});
+        });
+      });
+      tablaBox.querySelectorAll(".btnDel").forEach(b=>{
+        b.addEventListener("click",()=>{
+          const f = b.dataset.fecha;
+          if (!confirm("¿Eliminar el registro de "+f+"?")) return;
+          const i = idxFecha(f); if (i===-1) return;
+          state.registros.splice(i,1);
+          save(state); renderAll(); toast("Registro eliminado");
+        });
+      });
+    }
+
+    function renderAll(){
+      renderEstado();
+      renderSemanal();
+      renderRachas();
+      renderTabla();
+    }
+
+    // --- Boot ---
+    (function init(){
+      fillMetasForm();
+      $("#fFecha").value = todayISO();
+      renderAll();
+      setStatus("Listo");
+    })();
+  </script>
+</body>
+</html>
